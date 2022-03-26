@@ -4,9 +4,9 @@ use std::error::Error;
 
 static PTX: &str = include_str!("../../resources/kernels.ptx");
 
-pub(crate) fn matmul_gpu(lhs: &Vec<f32>, rhs: &Vec<f32>) -> Result<Vec<f32>, Box<dyn Error>> {
+pub fn matmul_gpu(lhs: &Vec<f32>, rhs: &Vec<f32>) -> Result<Vec<f32>, Box<dyn Error>> {
     let N2 = lhs.len();
-    let N = (N2 as f32).sqrt().round() as usize;;
+    let N = (N2 as f32).sqrt().round() as usize;
 
     let _ctx = cust::quick_init()?;
     let module = Module::from_ptx(PTX, &[])?;

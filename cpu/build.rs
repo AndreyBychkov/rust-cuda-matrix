@@ -1,3 +1,5 @@
+mod src;
+
 use cuda_builder::CudaBuilder;
 
 fn main() {

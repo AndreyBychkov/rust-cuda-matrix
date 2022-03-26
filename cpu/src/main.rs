@@ -1,5 +1,5 @@
-mod matmul_gpu;
-mod matmul_cpu;
+pub mod matmul_gpu;
+pub mod matmul_cpu;
 
 use cust::prelude::*;
 use nanorand::{Rng, WyRand};
