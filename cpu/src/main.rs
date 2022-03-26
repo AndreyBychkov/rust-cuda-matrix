@@ -2,16 +2,16 @@ use cust::prelude::*;
 use nanorand::{Rng, WyRand};
 use std::error::Error;
 
-const NUMBERS_LEN: usize = 100_000;
+const N: usize = 100;
+const N2: usize = (N * N) as usize;
 
-static PTX: &str = include_str!("../../resources/add.ptx");
+static PTX: &str = include_str!("../../resources/kernels.ptx");
 
-
-fn main() -> Result<(), Box<dyn Error>> {
+fn add_task() -> Result<(), Box<dyn Error>> {
     let mut wyrand = WyRand::new();
-    let mut lhs = vec![2.0f32; NUMBERS_LEN];
+    let mut lhs = vec![2.0f32; N2];
     wyrand.fill(&mut lhs);
-    let mut rhs = vec![0.0f32; NUMBERS_LEN];
+    let mut rhs = vec![0.0f32; N2];
     wyrand.fill(&mut rhs);
 
     // initialize CUDA, this will pick the first available device and will
@@ -33,7 +33,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // allocate our output buffer. You could also use DeviceBuffer::uninitialized() to avoid the
     // cost of the copy, but you need to be careful not to read from the buffer.
-    let mut out = vec![0.0f32; NUMBERS_LEN];
+    let mut out = vec![0.0f32; N2];
     let out_buf = out.as_slice().as_dbuf()?;
 
     // retrieve the add kernel from the module so we can calculate the right launch config.
@@ -44,7 +44,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // current CUDA device/architecture.
     let (_, block_size) = func.suggested_launch_configuration(0, 0.into())?;
 
-    let grid_size = (NUMBERS_LEN as u32 + block_size - 1) / block_size;
+    let grid_size = (N2 as u32 + block_size - 1) / block_size;
 
     println!(
         "using {} blocks and {} threads per block",
@@ -73,4 +73,57 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     println!("{} + {} = {}", lhs[0], rhs[0], out[0]);
     Ok(())
+}
+
+fn matmul_task() -> Result<(), Box<dyn Error>> {
+    let mut wyrand = WyRand::new();
+    let mut lhs = vec![2.0f32; N2];
+    wyrand.fill(&mut lhs);
+    let mut rhs = vec![0.0f32; N2];
+    wyrand.fill(&mut rhs);
+
+    let _ctx = cust::quick_init()?;
+    let module = Module::from_ptx(PTX, &[])?;
+    let stream = Stream::new(StreamFlags::NON_BLOCKING, None)?;
+
+    let lhs_gpu = lhs.as_slice().as_dbuf()?;
+    let rhs_gpu = rhs.as_slice().as_dbuf()?;
+
+    let mut out = vec![0.0f32; N2];
+    let out_buf = out.as_slice().as_dbuf()?;
+
+    let func = module.get_function("matmul")?;
+    let (_, block_size) = func.suggested_launch_configuration(0, 0.into())?;
+
+    let grid_size = (N2 as u32 + block_size - 1) / block_size;
+
+    println!(
+        "using {} blocks and {} threads per block",
+        grid_size, block_size
+    );
+
+    unsafe {
+        launch!(
+            func<<<grid_size, block_size, 0, stream>>>(
+                lhs_gpu.as_device_ptr(),
+                lhs_gpu.len(),
+                rhs_gpu.as_device_ptr(),
+                rhs_gpu.len(),
+                out_buf.as_device_ptr(),
+                N
+            )
+        )?;
+    }
+
+    stream.synchronize()?;
+
+    out_buf.copy_to(&mut out)?;
+
+    println!("a[0] = {}, b[0] = {}, c[0] = {}", lhs[0], rhs[0], out[0]);
+    Ok(())
+}
+
+
+fn main() -> Result<(), Box<dyn Error>> {
+    matmul_task()
 }
