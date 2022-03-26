@@ -1,6 +1,12 @@
+mod matmul_gpu;
+mod matmul_cpu;
+
 use cust::prelude::*;
 use nanorand::{Rng, WyRand};
 use std::error::Error;
+use crate::matmul_cpu::matmul_cpu;
+use crate::matmul_gpu::matmul_gpu;
+use approx::*;
 
 const N: usize = 100;
 const N2: usize = (N * N) as usize;
@@ -82,44 +88,13 @@ fn matmul_task() -> Result<(), Box<dyn Error>> {
     let mut rhs = vec![0.0f32; N2];
     wyrand.fill(&mut rhs);
 
-    let _ctx = cust::quick_init()?;
-    let module = Module::from_ptx(PTX, &[])?;
-    let stream = Stream::new(StreamFlags::NON_BLOCKING, None)?;
+    let out_cpu = matmul_cpu(&lhs, &rhs);
+    let out_gpu = matmul_gpu(&lhs, &rhs).expect("Problem with gpu code");
 
-    let lhs_gpu = lhs.as_slice().as_dbuf()?;
-    let rhs_gpu = rhs.as_slice().as_dbuf()?;
-
-    let mut out = vec![0.0f32; N2];
-    let out_buf = out.as_slice().as_dbuf()?;
-
-    let func = module.get_function("matmul")?;
-    let (_, block_size) = func.suggested_launch_configuration(0, 0.into())?;
-
-    let grid_size = (N2 as u32 + block_size - 1) / block_size;
-
-    println!(
-        "using {} blocks and {} threads per block",
-        grid_size, block_size
-    );
-
-    unsafe {
-        launch!(
-            func<<<grid_size, block_size, 0, stream>>>(
-                lhs_gpu.as_device_ptr(),
-                lhs_gpu.len(),
-                rhs_gpu.as_device_ptr(),
-                rhs_gpu.len(),
-                out_buf.as_device_ptr(),
-                N
-            )
-        )?;
+    for (c, g) in out_cpu.iter().zip(out_gpu.iter()) {
+        abs_diff_eq!(c, g);
     }
-
-    stream.synchronize()?;
-
-    out_buf.copy_to(&mut out)?;
-
-    println!("a[0] = {}, b[0] = {}, c[0] = {}", lhs[0], rhs[0], out[0]);
+    println!("Ok!");
     Ok(())
 }
 

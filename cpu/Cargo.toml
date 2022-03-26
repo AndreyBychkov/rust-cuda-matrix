@@ -8,7 +8,8 @@ edition = "2021"
 [dependencies]
 cust = "*"
 nanorand = "0.6.1"
-
+rayon = "*"
+approx = "*"
 
 [build-dependencies]
 cuda_builder = "*"
