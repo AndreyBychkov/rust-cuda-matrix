@@ -1,9 +1,12 @@
 use rayon::prelude::*;
 use rayon::iter::{ParallelIterator, IntoParallelRefIterator};
+use indicatif::*;
 
-pub fn matmul_cpu(l: &Vec<f32>, r: &Vec<f32>) -> Vec<f32> {
+pub(crate) fn matmul_cpu_par(l: &Vec<f32>, r: &Vec<f32>) -> Vec<f32> {
     let mut res = vec![0.0; l.len()];
     let n = (l.len() as f32).sqrt().round() as usize;
+    // let pb = ProgressBar::new(n as u64);
+    // pb.set_style(ProgressStyle::with_template("[{elapsed_precise}] {wide_bar} {duration_precise} {msg}").unwrap());
 
     let step_row = |(i, r_row): (usize, &mut [f32])| {
         for (j, res_row) in r_row.iter_mut().enumerate() {
@@ -15,7 +18,9 @@ pub fn matmul_cpu(l: &Vec<f32>, r: &Vec<f32>) -> Vec<f32> {
             }
             *res_row = c;
         }
+        // pb.inc(1);
     };
+
 
     res.par_chunks_mut(n)
         .enumerate()

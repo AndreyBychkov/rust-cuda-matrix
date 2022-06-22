@@ -1,10 +1,11 @@
 use cust::prelude::*;
 use nanorand::{Rng, WyRand};
 use std::error::Error;
+use std::time::Instant;
 
 static PTX: &str = include_str!("../../resources/kernels.ptx");
 
-pub fn matmul_gpu(lhs: &Vec<f32>, rhs: &Vec<f32>) -> Result<Vec<f32>, Box<dyn Error>> {
+pub(crate) fn matmul_gpu(lhs: &Vec<f32>, rhs: &Vec<f32>) -> Result<Vec<f32>, Box<dyn Error>> {
     let N2 = lhs.len();
     let N = (N2 as f32).sqrt().round() as usize;
 
@@ -28,6 +29,8 @@ pub fn matmul_gpu(lhs: &Vec<f32>, rhs: &Vec<f32>) -> Result<Vec<f32>, Box<dyn Er
         grid_size, block_size
     );
 
+    stream.synchronize()?;
+    let start = Instant::now();
     unsafe {
         launch!(
             func<<<grid_size, block_size, 0, stream>>>(
@@ -35,13 +38,14 @@ pub fn matmul_gpu(lhs: &Vec<f32>, rhs: &Vec<f32>) -> Result<Vec<f32>, Box<dyn Er
                 lhs_gpu.len(),
                 rhs_gpu.as_device_ptr(),
                 rhs_gpu.len(),
-                out_buf.as_device_ptr(),
-                N
+                out_buf.as_device_ptr()
             )
         )?;
     }
 
     stream.synchronize()?;
+    let elapsed = start.elapsed();
+    println!("Spent on kernel = {}s", elapsed.as_secs_f32());
 
     out_buf.copy_to(&mut out)?;
     Ok(out)

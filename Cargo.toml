@@ -13,6 +13,9 @@ rayon = "*"
 approx = "*"
 cust = "*"
 
+[build-dependencies]
+cuda_builder = "*"
+
 [[bench]]
 name = "example"
 harness = false

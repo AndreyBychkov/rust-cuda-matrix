@@ -1,4 +1,3 @@
-
 fn main() {
-    println!("Hello, CUDA")
+    println!("Hello, Main");
 }

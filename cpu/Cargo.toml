@@ -10,6 +10,7 @@ cust = "*"
 nanorand = "0.6.1"
 rayon = "*"
 approx = "*"
+indicatif = { versiion = "0.17.0-rc.10", rayon = true }
 
 [build-dependencies]
 cuda_builder = "*"

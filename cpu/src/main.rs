@@ -1,14 +1,15 @@
-pub mod matmul_gpu;
-pub mod matmul_cpu;
+mod matmul_cpu;
+mod matmul_gpu;
 
 use cust::prelude::*;
 use nanorand::{Rng, WyRand};
 use std::error::Error;
-use crate::matmul_cpu::matmul_cpu;
-use crate::matmul_gpu::matmul_gpu;
+use matmul_cpu::matmul_cpu_par;
+use matmul_gpu::matmul_gpu;
 use approx::*;
+use std::time::Instant;
 
-const N: usize = 100;
+const N: usize = 1024 * 4;
 const N2: usize = (N * N) as usize;
 
 static PTX: &str = include_str!("../../resources/kernels.ptx");
@@ -68,6 +69,7 @@ fn add_task() -> Result<(), Box<dyn Error>> {
                 rhs_gpu.as_device_ptr(),
                 rhs_gpu.len(),
                 out_buf.as_device_ptr(),
+                N
             )
         )?;
     }
@@ -87,10 +89,14 @@ fn matmul_task() -> Result<(), Box<dyn Error>> {
     wyrand.fill(&mut lhs);
     let mut rhs = vec![0.0f32; N2];
     wyrand.fill(&mut rhs);
-
-    let out_cpu = matmul_cpu(&lhs, &rhs);
+    let start_cpu = Instant::now();
+    let out_cpu = matmul_cpu_par(&lhs, &rhs);
+    let elapsed_cpu = start_cpu.elapsed();
+    println!("{}s elapsed on CPU", elapsed_cpu.as_secs_f32());
+    let start_gpu = Instant::now();
     let out_gpu = matmul_gpu(&lhs, &rhs).expect("Problem with gpu code");
-
+    let elapsed_gpu = start_gpu.elapsed();
+    println!("{}s elapsed on GPU", elapsed_gpu.as_secs_f32());
     for (c, g) in out_cpu.iter().zip(out_gpu.iter()) {
         abs_diff_eq!(c, g);
     }
